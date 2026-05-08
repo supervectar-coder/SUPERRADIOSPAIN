@@ -1,1 +1,288 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SV RADIOS ESPAÑA</title>
 
+<style>
+body{
+  font-family:system-ui;
+  margin:0;
+  padding:16px;
+  display:grid;
+  gap:12px;
+  grid-template-columns:340px 1fr;
+  height:100vh;
+  box-sizing:border-box;
+
+  background-image:url("https://i.ibb.co/XrFjh6jh/images.jpg");
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  background-attachment:fixed;
+
+  color:#c00000;
+}
+
+
+header{
+  grid-column:1/-1;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+header img.logo{
+  width:40px;
+  height:40px;
+}
+
+h1{margin:0;font-size:20px}
+
+.left{
+  overflow:auto;
+  border:1px solid #c00000;
+  padding:8px;
+  border-radius:8px;
+  background:#fff;
+}
+
+.search{margin-bottom:8px}
+
+input{
+  width:100%;
+  padding:6px;
+  border-radius:6px;
+  border:1px solid #c00000;
+}
+
+li.channel{
+  padding:6px;
+  border-bottom:1px solid #f0baba;
+}
+
+li.channel:hover{background:#ffecec}
+li.channel.active{background:#ffdada}
+li.channel.active .channel-title{color:#c00000}
+
+button{
+  background:#fff;
+  border:1px solid #c00000;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+button:hover{background:#c00000;color:#fff}
+button.active-btn{background:#c00000;color:#fff}
+
+.title-line{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.channel-info{
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
+
+.channel-info img{
+  width:26px;
+  height:26px;
+}
+
+.group-header{
+  font-weight:600;
+  padding:6px;
+  margin-top:6px;
+  background:#ffe5e5;
+  border-radius:6px;
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  border:1px solid #c00000;
+}
+
+.group-channels{display:none;padding:0;margin:0}
+.group-channels.open{display:block}
+
+.right{display:flex;flex-direction:column;gap:12px}
+
+.audio-container{
+  background:#fff;
+  border:2px solid #c00000;
+  padding:20px;
+  border-radius:12px;
+}
+
+audio{width:100%}
+
+.note{font-size:13px;color:#888}
+.error{color:red}
+
+footer{
+  grid-column:1/-1;
+  font-size:13px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<img src="https://i.ibb.co/7dGjZb80/6.jpg" class="logo">
+<h1>SV RADIOS ESPAÑA</h1>
+</header>
+
+<div class="left">
+<input id="filter" placeholder="Buscar...">
+<div id="groups"></div>
+</div>
+
+<div class="right">
+<div>
+<div id="current-title"><b>Selecciona un canal</b></div>
+<div id="current-info" class="note"></div>
+</div>
+
+<div class="audio-container">
+<audio id="player" controls></audio>
+</div>
+
+<div>
+<div id="status" class="note"></div>
+<div id="error" class="error"></div>
+</div>
+</div>
+
+<footer>SV RADIOS ESPAÑA</footer>
+
+<script>
+(async function(){
+
+const url="https://raw.githubusercontent.com/supervectar-coder/radioespa-a/refs/heads/main/radioespa%C3%B1a.m3u";
+const groups=document.getElementById("groups");
+const player=document.getElementById("player");
+const filter=document.getElementById("filter");
+
+let activeBtn=null,activeLi=null,playlist=[];
+
+function parse(txt){
+ let lines=txt.split(/\n/);
+ let out=[],info=null;
+ lines.forEach(l=>{
+  l=l.trim();
+  if(l.startsWith("#EXTINF")) info=l;
+  else if(l && !l.startsWith("#")){
+    let t=l,g="Otros",logo=null;
+    if(info){
+      let c=info.indexOf(",");
+      if(c>-1) t=info.slice(c+1);
+      let m=info.match(/group-title="([^"]+)"/); if(m) g=m[1];
+      let lg=info.match(/tvg-logo="([^"]+)"/); if(lg) logo=lg[1];
+    }
+    out.push({title:t,url:l,group:g,logo});
+    info=null;
+  }
+ });
+ return out;
+}
+
+function render(list,f=""){
+ groups.innerHTML="";
+ let g={};
+ list.forEach(i=>{
+  if(f && !i.title.toLowerCase().includes(f.toLowerCase()))return;
+  if(!g[i.group])g[i.group]=[];
+  g[i.group].push(i);
+ });
+
+ Object.keys(g).sort().forEach(gr=>{
+  let h=document.createElement("div");
+  h.className="group-header";
+  h.innerHTML=gr+" <span>▼</span>";
+
+  let ul=document.createElement("ul");
+  ul.className="group-channels";
+
+  g[gr].forEach(it=>{
+   let li=document.createElement("li");
+   li.className="channel";
+
+   let d=document.createElement("div");
+   d.className="title-line";
+
+   let inf=document.createElement("div");
+   inf.className="channel-info";
+   if(it.logo){
+    let im=document.createElement("img");
+    im.src=it.logo;
+    inf.appendChild(im);
+   }
+
+   let sp=document.createElement("div");
+   sp.textContent=it.title;
+   sp.className="channel-title";
+   inf.appendChild(sp);
+
+   let b=document.createElement("button");
+   b.textContent="▶";
+   b.onclick=()=>play(it,b,li);
+
+   d.appendChild(inf);
+   d.appendChild(b);
+   li.appendChild(d);
+   ul.appendChild(li);
+  });
+
+  h.onclick=()=>{
+   ul.classList.toggle("open");
+   h.querySelector("span").textContent=ul.classList.contains("open")?"▲":"▼";
+  };
+
+  groups.appendChild(h);
+  groups.appendChild(ul);
+ });
+}
+
+function play(it,b,li){
+ if(activeBtn)activeBtn.classList.remove("active-btn");
+ if(activeLi)activeLi.classList.remove("active");
+
+ b.classList.add("active-btn");
+ li.classList.add("active");
+ activeBtn=b;activeLi=li;
+
+ const ul=li.closest(".group-channels");
+ if(ul){ul.classList.add("open");}
+
+ player.src=it.url;
+ player.play();
+ localStorage.setItem("last",JSON.stringify(it));
+}
+
+filter.oninput=()=>{render(playlist,filter.value);document.querySelectorAll(".group-channels").forEach(x=>x.classList.add("open"));}
+
+const r=await fetch(url);
+playlist=parse(await r.text());
+render(playlist);
+
+const last=localStorage.getItem("last");
+if(last){
+ const s=JSON.parse(last);
+ setTimeout(()=>{
+  document.querySelectorAll("button").forEach(b=>{
+   if(b.onclick.toString().includes(s.url))b.click();
+  });
+ },500);
+}else{
+ setTimeout(()=>document.querySelector("button")?.click(),500);
+}
+
+})();
+</script>
+
+</body>
+</html>
